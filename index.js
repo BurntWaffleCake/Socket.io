@@ -38,6 +38,13 @@ app.use(express.static(__dirname));
 // cookie parser middleware
 app.use(cookieParser());
 
+//username and password
+let passwords = {
+  user1: "mypassword",
+  user2: "password",
+  admin: "totallyAdmin",
+};
+
 const loginPath = "./views/login.html";
 const chatRoomPath = "./views/chatRoom.html";
 
@@ -61,6 +68,9 @@ app.post("/user", (req, res) => {
   if (user.password == req.body.password) {
     var session = req.session;
     session.userid = req.body.username;
+    session.connected = true;
+    loggedInUsers[req.body.username] = true;
+    console.log(req.session);
     res.redirect("/");
   } else {
     res.send("Invalid username or password");
@@ -68,6 +78,7 @@ app.post("/user", (req, res) => {
 });
 
 app.get("/logout", (req, res) => {
+  loggedInUsers[req.session.userid] = null;
   req.session.destroy();
   res.redirect("/");
 });
@@ -79,7 +90,7 @@ io.on("connection", (socket) => {
   const session = socket.request.session;
 
   socket.on("chat message", (msg) => {
-    if (session.userid === undefined) return;
+    console.log(session.userid);
     let message = { username: session.userid, message: msg.message, time: Date.now() };
     messages.push(message);
     io.emit("chat message", message);
