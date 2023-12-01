@@ -40,6 +40,8 @@ let passwords = {
   admin: "totallyAdmin",
 };
 
+var loggedInUsers = {};
+
 const loginPath = "./views/login.html";
 const chatRoomPath = "./views/chatRoom.html";
 
@@ -61,13 +63,17 @@ app.post("/user", (req, res) => {
   if (passwords[req.body.username] && req.body.password == passwords[req.body.username]) {
     var session = req.session;
     session.userid = req.body.username;
+    session.connected = true;
+    loggedInUsers[req.body.username] = true;
+    console.log(req.session);
     res.redirect("/");
   } else {
-    res.sendStatus("Invalid username or password");
+    res.send("Invalid username or password");
   }
 });
 
 app.get("/logout", (req, res) => {
+  loggedInUsers[req.session.userid] = null;
   req.session.destroy();
   res.redirect("/");
 });
@@ -79,7 +85,10 @@ io.on("connection", (socket) => {
   const session = socket.request.session;
 
   socket.on("chat message", (msg) => {
-    console.log(session.userid);
+    if (loggedInUsers[session.userid] === null) {
+      socket.emit("redirect", "/");
+    }
+
     let message = { username: session.userid, message: msg.message, time: Date.now() };
     messages.push(message);
     io.emit("chat message", message);
