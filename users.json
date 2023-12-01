@@ -1,0 +1,17 @@
+{
+  "user1": {
+    "password": "mypassword",
+    "account_created_date": 1010101,
+    "online": false
+  },
+  "user2": {
+    "password": "password",
+    "account_created_date": 1010101,
+    "online": false
+  },
+  "admin": {
+    "password": "totallyAdmin",
+    "account_created_date": 1010101,
+    "online": false
+  }
+}

@@ -1,16 +1,18 @@
 const express = require("express");
 const { createServer } = require("node:http");
-const { join } = require("node:path");
-const { setDefaultHighWaterMark } = require("node:stream");
+const process = require("node:process");
 const { Server } = require("socket.io");
 
 const app = express();
 const server = createServer(app);
 const io = new Server(server);
+
 const fs = require("fs");
 const cookieParser = require("cookie-parser");
 const session = require("express-session");
 const PORT = 4000;
+
+const users = require("./users.json");
 
 const oneDay = 1000 * 60 * 60 * 24;
 const sessionMiddleware = session({
@@ -23,6 +25,9 @@ const sessionMiddleware = session({
 app.use(sessionMiddleware);
 io.engine.use(sessionMiddleware);
 
+const chatRoom = require("./routes/chatRoom.js");
+app.use("/chatRoom", chatRoom);
+
 // parsing the incoming data
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -32,13 +37,6 @@ app.use(express.static(__dirname));
 
 // cookie parser middleware
 app.use(cookieParser());
-
-//username and password
-let passwords = {
-  user1: "mypassword",
-  user2: "password",
-  admin: "totallyAdmin",
-};
 
 const loginPath = "./views/login.html";
 const chatRoomPath = "./views/chatRoom.html";
@@ -50,20 +48,22 @@ app.get("/", (req, res) => {
   } else res.sendFile(loginPath, { root: __dirname });
 });
 
-app.get("/chatRoom", (req, res) => {
-  var session = req.session;
-  if (session.userid) {
-    res.sendFile(chatRoomPath, { root: __dirname });
-  } else res.redirect("/");
-});
+// app.get("/chatRoom", (req, res) => {
+// });
 
 app.post("/user", (req, res) => {
-  if (passwords[req.body.username] && req.body.password == passwords[req.body.username]) {
+  let user = users[req.body.username];
+  if (user === undefined) {
+    res.send("Invalid username or password");
+    return;
+  }
+
+  if (user.password == req.body.password) {
     var session = req.session;
     session.userid = req.body.username;
     res.redirect("/");
   } else {
-    res.sendStatus("Invalid username or password");
+    res.send("Invalid username or password");
   }
 });
 
@@ -79,7 +79,7 @@ io.on("connection", (socket) => {
   const session = socket.request.session;
 
   socket.on("chat message", (msg) => {
-    console.log(session.userid);
+    if (session.userid === undefined) return;
     let message = { username: session.userid, message: msg.message, time: Date.now() };
     messages.push(message);
     io.emit("chat message", message);
@@ -95,9 +95,25 @@ server.listen(PORT, () => {
   console.log("server running at http://localhost:" + String(PORT));
 });
 
-// const updateDelay = 5000;
-// function sendUpdateEvent() {
-//   io.emit("updateEvent", { time: Date.now() });
-//   setTimeout(sendUpdateEvent, updateDelay);
-// }
-// setTimeout(sendUpdateEvent, updateDelay);
+function loadSave(path) {
+  fs.readFile(path, (err, data) => {
+    if (err) throw err;
+
+    messages = JSON.parse(data);
+
+    console.log(messages);
+  });
+}
+
+// loadSave(`${__dirname}/chatRoomSaves/chatSave-Fri Dec 01 2023.json`);
+
+var messageSaveDir = `/chatRoomSaves`;
+function saveMessagesToJson(path) {
+  if (path === null) throw "save path needed";
+  var fileName = `/chatSave-${new Date(Date.now()).toDateString()}.json`;
+
+  fs.writeFile(`${__dirname}${path}${fileName}`, JSON.stringify(messages), (err) => {
+    if (err) throw err;
+    console.log("saves chat");
+  });
+}
